@@ -40,19 +40,19 @@ def _chunks(iterable, n):
         yield g
 
 
-def psycopg_connect(args):
+def psycopg2_connect(args):
     conn = psycopg2.connect(user=args.pguser, host=args.pghost,
                             port=args.pgport)
     return conn
 
 
-def psycopg_execute(conn, query, args):
+def psycopg2_execute(conn, query, args):
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     cur.execute(query, args)
     return len(cur.fetchall())
 
 
-def psycopg_copy(conn, query, args):
+def psycopg2_copy(conn, query, args):
     rows, copy = args[:2]
     f = io.StringIO()
     writer = csv.writer(f, delimiter='\t')
@@ -65,7 +65,7 @@ def psycopg_copy(conn, query, args):
     return cur.rowcount
 
 
-def psycopg_executemany(conn, query, args):
+def psycopg2_executemany(conn, query, args):
     cur = conn.cursor()
     psycopg2.extras.execute_batch(cur, query, args)
     return len(args)
@@ -375,7 +375,7 @@ if __name__ == '__main__':
         help='PostgreSQL server user')
     parser.add_argument(
         'driver', help='driver implementation to use',
-        choices=['aiopg', 'aiopg-tuples', 'asyncpg', 'psycopg', 'postgresql'])
+        choices=['aiopg', 'aiopg-tuples', 'asyncpg', 'psycopg2', 'postgresql'])
     parser.add_argument(
         'queryfile', help='file to read benchmark query information from')
 
@@ -408,7 +408,7 @@ if __name__ == '__main__':
     if args.driver == 'aiopg':
         if query.startswith('COPY '):
             connector, executor, copy_executor = \
-                psycopg_connect, psycopg_execute, psycopg_copy
+                psycopg2_connect, psycopg2_execute, psycopg2_copy
             is_async = False
         else:
             connector, executor, batch_executor = \
@@ -418,7 +418,7 @@ if __name__ == '__main__':
     elif args.driver == 'aiopg-tuples':
         if query.startswith('COPY '):
             connector, executor, copy_executor = \
-                psycopg_connect, psycopg_execute, psycopg_copy
+                psycopg2_connect, psycopg2_execute, psycopg2_copy
             is_async = False
         else:
             connector, executor, batch_executor = \
@@ -431,9 +431,9 @@ if __name__ == '__main__':
             asyncpg_connect, asyncpg_execute, asyncpg_copy, asyncpg_executemany
         is_async = True
         arg_format = 'native'
-    elif args.driver == 'psycopg':
+    elif args.driver == 'psycopg2':
         connector, executor, copy_executor, batch_executor = \
-            psycopg_connect, psycopg_execute, psycopg_copy, psycopg_executemany
+            psycopg2_connect, psycopg2_execute, psycopg2_copy, psycopg2_executemany
         is_async = False
         arg_format = 'python'
     elif args.driver == 'postgresql':
