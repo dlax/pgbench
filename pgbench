@@ -359,6 +359,7 @@ BENCHMARKS = [
     'golang-pgx',
     'python-aiopg',
     'python-aiopg-tuples',
+    'python-psycopg2',
     'python-asyncpg',
     'nodejs-pg-js',
     'nodejs-ts-postgres'
