@@ -65,6 +65,12 @@ def psycopg_copy(conn, query, args):
     return cur.rowcount
 
 
+def psycopg_executemany(conn, query, args):
+    cur = conn.cursor()
+    psycopg2.extras.execute_batch(cur, query, args)
+    return len(args)
+
+
 def pypostgresql_connect(args):
     conn = postgresql.open(user=args.pguser, host=args.pghost,
                            port=args.pgport)
@@ -426,8 +432,8 @@ if __name__ == '__main__':
         is_async = True
         arg_format = 'native'
     elif args.driver == 'psycopg':
-        connector, executor, copy_executor = \
-            psycopg_connect, psycopg_execute, psycopg_copy
+        connector, executor, copy_executor, batch_executor = \
+            psycopg_connect, psycopg_execute, psycopg_copy, psycopg_executemany
         is_async = False
         arg_format = 'python'
     elif args.driver == 'postgresql':
