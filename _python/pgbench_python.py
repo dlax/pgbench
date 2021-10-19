@@ -24,6 +24,9 @@ import uvloop
 import aiopg
 import asyncpg
 import postgresql
+import psycopg
+import psycopg.sql
+import psycopg.rows
 import psycopg2
 import psycopg2.extras
 
@@ -38,6 +41,74 @@ def _chunks(iterable, n):
         return k
     for _, g in itertools.groupby(iterable, _ctr):
         yield g
+
+
+def psycopg_connect(args):
+    conn = psycopg.connect(user=args.pguser, host=args.pghost,
+                           port=args.pgport,
+                           row_factory=psycopg.rows.dict_row)
+    return conn
+
+
+def psycopg_execute(conn, query, args):
+    cur = conn.execute(query, args)
+    return len(cur.fetchall())
+
+
+def psycopg_copy(conn, query, args):
+    rows, copy = args[:2]
+    query = psycopg.sql.SQL('COPY {} ({}) FROM STDIN').format(
+        psycopg.sql.Identifier(copy['table']),
+        psycopg.sql.SQL(',').join(
+            [psycopg.sql.Identifier(column) for column in copy['columns']]
+        ),
+    )
+    cur = conn.cursor()
+    with cur.copy(query) as copy:
+        for row in rows:
+            copy.write_row(row)
+    conn.commit()
+    return cur.rowcount
+
+
+def psycopg_executemany(conn, query, args):
+    conn.cursor().executemany(query, args)
+    return len(args)
+
+
+async def psycopg_async_connect(args):
+    conn = await psycopg.AsyncConnection.connect(
+        user=args.pguser, host=args.pghost,
+        port=args.pgport,
+        row_factory=psycopg.rows.dict_row
+    )
+    return conn
+
+
+async def psycopg_async_execute(conn, query, args):
+    cur = await conn.execute(query, args)
+    return len(await cur.fetchall())
+
+
+async def psycopg_async_copy(conn, query, args):
+    rows, copy = args[:2]
+    query = psycopg.sql.SQL('COPY {} ({}) FROM STDIN').format(
+        psycopg.sql.Identifier(copy['table']),
+        psycopg.sql.SQL(',').join(
+            [psycopg.sql.Identifier(column) for column in copy['columns']]
+        ),
+    )
+    cur = conn.cursor()
+    async with cur.copy(query) as copy:
+        for row in rows:
+            await copy.write_row(row)
+    await conn.commit()
+    return cur.rowcount
+
+
+async def psycopg_async_executemany(conn, query, args):
+    await conn.cursor().executemany(query, args)
+    return len(args)
 
 
 def psycopg2_connect(args):
@@ -375,7 +446,8 @@ if __name__ == '__main__':
         help='PostgreSQL server user')
     parser.add_argument(
         'driver', help='driver implementation to use',
-        choices=['aiopg', 'aiopg-tuples', 'asyncpg', 'psycopg2', 'postgresql'])
+        choices=['aiopg', 'aiopg-tuples', 'asyncpg', 'psycopg2',
+                 'psycopg', 'psycopg-async', 'postgresql'])
     parser.add_argument(
         'queryfile', help='file to read benchmark query information from')
 
@@ -435,6 +507,16 @@ if __name__ == '__main__':
         connector, executor, copy_executor, batch_executor = \
             psycopg2_connect, psycopg2_execute, psycopg2_copy, psycopg2_executemany
         is_async = False
+        arg_format = 'python'
+    elif args.driver == 'psycopg':
+        connector, executor, copy_executor, batch_executor = \
+            psycopg_connect, psycopg_execute, psycopg_copy, psycopg_executemany
+        is_async = False
+        arg_format = 'python'
+    elif args.driver == 'psycopg-async':
+        connector, executor, copy_executor, batch_executor = \
+            psycopg_async_connect, psycopg_async_execute, psycopg_async_copy, psycopg_async_executemany
+        is_async = True
         arg_format = 'python'
     elif args.driver == 'postgresql':
         connector, executor = pypostgresql_connect, pypostgresql_execute
