@@ -233,6 +233,8 @@ async def worker(executor, eargs, start, duration, timeout):
         req_start = time.monotonic()
         rows += await executor(*eargs)
         req_time = round((time.monotonic() - req_start) * 1000 * 100)
+        if req_time >= timeout * 100:
+            continue
 
         if req_time > max_latency:
             max_latency = req_time
@@ -255,6 +257,8 @@ def sync_worker(executor, eargs, start, duration, timeout):
         req_start = time.monotonic()
         rows += executor(*eargs)
         req_time = round((time.monotonic() - req_start) * 1000 * 100)
+        if req_time >= timeout * 100:
+            continue
 
         if req_time > max_latency:
             max_latency = req_time
