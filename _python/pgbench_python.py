@@ -25,8 +25,11 @@ import aiopg
 import asyncpg
 import postgresql
 import psycopg
+import psycopg.pq
 import psycopg.sql
 import psycopg.rows
+from psycopg._queries import PostgresQuery
+from psycopg.adapt import Transformer
 import psycopg2
 import psycopg2.extras
 
@@ -75,6 +78,71 @@ def psycopg_copy(conn, query, args):
 def psycopg_executemany(conn, query, args):
     conn.cursor().executemany(query, args)
     return len(args)
+
+
+def pq_connect(args):
+    conn = psycopg.connect(user=args.pguser, host=args.pghost,
+                           port=args.pgport,
+                           autocommit=True,
+                           row_factory=psycopg.rows.dict_row)
+    return conn
+
+
+def pq_execute(conn, query, args):
+    pgq = PostgresQuery(Transformer())
+    pgq.convert(query, tuple(args))
+    if pgq.params:
+        res = conn.pgconn.exec_params(
+            pgq.query, pgq.params, pgq.types, pgq.formats
+        )
+    else:
+        res = conn.pgconn.exec_(pgq.query)
+    assert res.status == psycopg.pq.ExecStatus.TUPLES_OK, res.error_message
+    return res.ntuples
+
+
+def pq_executemany(conn, query, args):
+    pgq = PostgresQuery(Transformer(conn))
+    first = True
+    for params in args:
+        if first:
+            pgq.convert(query, params)
+            first = False
+        else:
+            pgq.dump(params)
+        res = conn.pgconn.exec_params(
+            pgq.query, pgq.params, pgq.types, pgq.formats
+        )
+        assert res.status == psycopg.pq.ExecStatus.COMMAND_OK, res.error_message
+    return len(args)
+
+
+def pq_copy(conn, query, args):
+    rows, copy = args[:2]
+    pgconn = conn.pgconn
+    query = psycopg.sql.SQL('COPY {} ({}) FROM STDIN').format(
+        psycopg.sql.Identifier(copy['table']),
+        psycopg.sql.SQL(',').join(
+            [psycopg.sql.Identifier(column) for column in copy['columns']]
+        ),
+    )
+
+    res = pgconn.exec_(query.as_bytes(conn))
+    assert res.status == psycopg.pq.ExecStatus.COPY_IN
+
+    for row in rows:
+        res = pgconn.put_copy_data(
+            ("\t".join(map(str, row)) + "\n").encode()
+        )
+        assert res > 0
+
+    res = pgconn.put_copy_end()
+    assert res > 0
+
+    res = pgconn.get_result()
+    assert res.status == psycopg.pq.ExecStatus.COMMAND_OK, res.error_message
+
+    return len(rows)
 
 
 async def psycopg_async_connect(args):
@@ -454,7 +522,7 @@ if __name__ == '__main__':
     parser.add_argument(
         'driver', help='driver implementation to use',
         choices=['aiopg', 'aiopg-tuples', 'asyncpg', 'psycopg2',
-                 'psycopg', 'psycopg-async', 'postgresql'])
+                 'psycopg', 'psycopg-async', 'pq', 'postgresql'])
     parser.add_argument(
         'queryfile', help='file to read benchmark query information from')
 
@@ -524,6 +592,11 @@ if __name__ == '__main__':
         connector, executor, copy_executor, batch_executor = \
             psycopg_async_connect, psycopg_async_execute, psycopg_async_copy, psycopg_async_executemany
         is_async = True
+        arg_format = 'python'
+    elif args.driver == 'pq':
+        connector, executor, copy_executor, batch_executor = \
+            pq_connect, pq_execute, pq_copy, pq_executemany
+        is_async = False
         arg_format = 'python'
     elif args.driver == 'postgresql':
         connector, executor = pypostgresql_connect, pypostgresql_execute

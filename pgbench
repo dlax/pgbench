@@ -361,6 +361,7 @@ BENCHMARKS = [
     'python-aiopg-tuples',
     'python-psycopg',
     'python-psycopg-async',
+    'python-pq',
     'python-psycopg2',
     'python-asyncpg',
     'nodejs-pg-js',
