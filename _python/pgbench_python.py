@@ -46,6 +46,7 @@ def _chunks(iterable, n):
 def psycopg_connect(args):
     conn = psycopg.connect(user=args.pguser, host=args.pghost,
                            port=args.pgport,
+                           autocommit=True,
                            row_factory=psycopg.rows.dict_row)
     return conn
 
@@ -80,6 +81,7 @@ async def psycopg_async_connect(args):
     conn = await psycopg.AsyncConnection.connect(
         user=args.pguser, host=args.pghost,
         port=args.pgport,
+        autocommit=True,
         row_factory=psycopg.rows.dict_row
     )
     return conn
@@ -114,6 +116,7 @@ async def psycopg_async_executemany(conn, query, args):
 def psycopg2_connect(args):
     conn = psycopg2.connect(user=args.pguser, host=args.pghost,
                             port=args.pgport)
+    conn.autocommit = True
     return conn
 
 
