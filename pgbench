@@ -362,6 +362,7 @@ BENCHMARKS = [
     'python-psycopg',
     'python-psycopg-async',
     'python-pq',
+    'python-pq-async',
     'python-psycopg2',
     'python-asyncpg',
     'nodejs-pg-js',

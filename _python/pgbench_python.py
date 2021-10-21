@@ -28,8 +28,10 @@ import psycopg
 import psycopg.pq
 import psycopg.sql
 import psycopg.rows
+import psycopg.waiting
 from psycopg._queries import PostgresQuery
 from psycopg.adapt import Transformer
+from psycopg.cursor import execute as _psycopg_execute
 import psycopg2
 import psycopg2.extras
 
@@ -80,12 +82,7 @@ def psycopg_executemany(conn, query, args):
     return len(args)
 
 
-def pq_connect(args):
-    conn = psycopg.connect(user=args.pguser, host=args.pghost,
-                           port=args.pgport,
-                           autocommit=True,
-                           row_factory=psycopg.rows.dict_row)
-    return conn
+pq_connect = psycopg_connect
 
 
 def pq_execute(conn, query, args):
@@ -179,6 +176,33 @@ async def psycopg_async_copy(conn, query, args):
 async def psycopg_async_executemany(conn, query, args):
     await conn.cursor().executemany(query, args)
     return len(args)
+
+
+pq_async_connect = psycopg_async_connect
+
+
+async def pq_async_execute(conn, query, args):
+    pgq = PostgresQuery(Transformer())
+    pgq.convert(query, tuple(args))
+    pgconn = conn.pgconn
+    pgconn.nonblocking = 1
+    if pgq.params:
+        pgconn.send_query_params(
+            pgq.query, pgq.params, pgq.types, pgq.formats
+        )
+    else:
+        pgconn.send_query(pgq.query)
+    (res,) = await psycopg.waiting.wait_async(_psycopg_execute(pgconn), pgconn.socket)
+    assert res.status == psycopg.pq.ExecStatus.TUPLES_OK, res.error_message
+    return res.ntuples
+
+
+async def pq_async_executemany(conn, query, args):
+    return pq_executemany(conn, query, args)
+
+
+async def pq_async_copy(conn, query, args):
+    return pq_copy(conn, query, args)
 
 
 def psycopg2_connect(args):
@@ -522,7 +546,7 @@ if __name__ == '__main__':
     parser.add_argument(
         'driver', help='driver implementation to use',
         choices=['aiopg', 'aiopg-tuples', 'asyncpg', 'psycopg2',
-                 'psycopg', 'psycopg-async', 'pq', 'postgresql'])
+                 'psycopg', 'psycopg-async', 'pq', 'pq-async', 'postgresql'])
     parser.add_argument(
         'queryfile', help='file to read benchmark query information from')
 
@@ -597,6 +621,11 @@ if __name__ == '__main__':
         connector, executor, copy_executor, batch_executor = \
             pq_connect, pq_execute, pq_copy, pq_executemany
         is_async = False
+        arg_format = 'python'
+    elif args.driver == 'pq-async':
+        connector, executor, copy_executor, batch_executor = \
+            pq_async_connect, pq_async_execute, pq_async_copy, pq_async_executemany
+        is_async = True
         arg_format = 'python'
     elif args.driver == 'postgresql':
         connector, executor = pypostgresql_connect, pypostgresql_execute
