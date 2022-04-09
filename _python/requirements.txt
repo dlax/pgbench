@@ -2,6 +2,7 @@ aiopg
 asyncpg
 py-postgresql
 psycopg2-binary
-psycopg[binary]>=3.0
+git+https://github.com/psycopg/psycopg/#egg=psycopg&subdirectory=psycopg
+git+https://github.com/psycopg/psycopg/#egg=psycopg-c&subdirectory=psycopg_c
 numpy
 uvloop
