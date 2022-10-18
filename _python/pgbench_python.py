@@ -52,7 +52,10 @@ def psycopg_connect(args):
 
 
 def psycopg_execute(conn, query, args):
-    cur = conn.execute(query, args)
+    binary = None
+    if not args and "_bytes" in query:
+        binary = True
+    cur = conn.execute(query, args, binary=binary)
     return len(cur.fetchall())
 
 
@@ -88,7 +91,10 @@ async def psycopg_async_connect(args):
 
 
 async def psycopg_async_execute(conn, query, args):
-    cur = await conn.execute(query, args)
+    binary = None
+    if not args and "_bytes" in query:
+        binary = True
+    cur = await conn.execute(query, args, binary=binary)
     return len(await cur.fetchall())
 
 
