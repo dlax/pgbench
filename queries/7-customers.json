@@ -1,0 +1,7 @@
+{
+  "setup": "CREATE TABLE customer AS (WITH ids AS (SELECT generate_series(1, 10000) AS id) SELECT id AS id, 'c' || id AS name, 'desc ' || id AS description, id * 10 AS q, id * 20 AS p, id * 30 AS x, id * 40 AS y, NULL as z FROM ids);",
+  "teardown": "DROP TABLE IF EXISTS customer;",
+  "query": "SELECT customer.id, customer.name, customer.description, customer.q, customer.p, customer.x, customer.y, customer.z FROM customer WHERE customer.id = (SELECT (random() * 10000)::int);",
+  "args": []
+}
+
