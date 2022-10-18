@@ -1,7 +1,7 @@
-aiopg==1.0.0
-asyncpg==0.21.0
-py-postgresql==1.2.2
-psycopg2-binary==2.8.6
+aiopg
+asyncpg
+py-postgresql
+psycopg2-binary
 psycopg[binary]>=3.0
-numpy~=1.19.0
-uvloop~=0.14.0
+numpy
+uvloop
